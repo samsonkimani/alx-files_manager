@@ -10,7 +10,7 @@ const UsersController = {
     }
 
     if (!password) {
-      return res.status(400).json({ error: 'missing password' });
+      return res.status(400).json({ error: 'Missing password' });
     }
 
     console.log(email);
