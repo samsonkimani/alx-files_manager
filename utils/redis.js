@@ -8,9 +8,9 @@ class RedisClient {
       console.log('Cannot connect to a redis client ', error);
     });
 
-    this.client.on('connect', () => {
-      console.log('Redis client connected to the server');
-    });
+    //this.client.on('connect', () => {
+      //console.log('Redis client connected to the server');
+    //});
   }
 
   isAlive() {

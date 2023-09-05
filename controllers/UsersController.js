@@ -1,4 +1,5 @@
-import crypto from 'crypto';
+// import crypto from 'crypto';
+import sha1 from 'sha1';
 import dbClient from '../utils/db';
 
 const UsersController = {
@@ -13,8 +14,6 @@ const UsersController = {
       return res.status(400).json({ error: 'Missing password' });
     }
 
-    console.log(email);
-
     const userExists = await dbClient.client
       .db()
       .collection('users')
@@ -25,10 +24,12 @@ const UsersController = {
       return res.status(400).json({ error: 'Already Exixts' });
     }
 
-    const hashedPassword = crypto
-      .createHash('sha1')
-      .update(password)
-      .digest('hex');
+    // const hashedPassword = crypto
+    //   .createHash('sha1')
+    //   .update(password)
+    //   .digest('hex');
+
+    const hashedPassword = sha1(password);
 
     const newUser = {
       email,
