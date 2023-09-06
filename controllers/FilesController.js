@@ -2,7 +2,9 @@ import fs from "fs";
 import path from "path";
 import { v4 as uuidv4 } from "uuid";
 import dbClient from "../utils/db";
+import redisClient from "../utils/redis";
 import { ObjectID } from "mongodb";
+import * as fsp from "fs/promises";
 
 const FOLDER_PATH = process.env.FOLDER_PATH || "/tmp/files_manager";
 
@@ -12,29 +14,36 @@ const FilesController = {
     const key = `auth_${token}`;
     try {
       const userId = await redisClient.get(key);
+      console.log(`The user id is ${userId}`);
+
       if (userId) {
-        const users = dbClient.db.collection("users");
-        const idObject = new ObjectID(userId);
-        const user = await users.findOne({ _id: idObject });
+        const objectid = new ObjectID(userId);
+        const user = await dbClient.client.db().collection('users').findOne({ _id: objectid });
+        //console.log(user);
+        // const idObject = new ObjectID(userId);
+        // const user = await dbClient.client.db().collection('users').findOne({ _id: idObject });
         if (!user) {
           return null;
         }
-        console.log(user);
+        //console.log(`This is a ${user}`);
         return user;
       }
     } catch (error) {
-      console.log(`Error ${error}`);
+      console.log(`Error in validate user: ${error}`);
       return null;
     }
   },
 
   async postUpload(req, res) {
     const user = await FilesController.validateUser(req);
+    console.log("post upload user...");
+    console.log(user);
     if (!user) {
-      return response.status(401).json({ error: "Unauthorized" });
+      return res.status(401).json({ error: "Unauthorized" });
     }
 
     const { name, type, parentId = "0", isPublic = false, data } = req.body;
+    console.log(`parent id is ${parentId}`);
 
     if (!name) {
       return res.status(400).json({ error: "Missing name" });
@@ -48,23 +57,36 @@ const FilesController = {
       return res.status(400).json({ error: "Missing data" });
     }
 
-    if (parentId !== "0") {
-      const parentFile = await dbClient.client
-        .db()
-        .collection("files")
-        .findOne({ parentId: parentId });
+    const objectid = new ObjectID(parentId);
+    const parentIdset = await dbClient.client.db().collection('files').findOne({ _id: objectid});
 
-      if (!parentFile) {
+    if (!parentIdset) {
         return res.status(400).json({ error: "Parent not found" });
-      }
-
-      if (parentFile.type !== "folder") {
-        return res.status(400).json({ error: "Parent is not a folder" });
-      }
     }
+    if (parentIdset.type !== "folder") {
+        return res.status(400).json({ error: "Parent is not a folder" });
+    }
+
+    // if (parentId !== "0") {
+    //   const parentFile = await dbClient.client
+    //     .db()
+    //     .collection("files")
+    //     .findOne({ parentId: parentId });
+    //     console.log(parentFile);
+    //   if (!parentFile) {
+    //     return res.status(400).json({ error: "Parent not found" });
+    //   }
+
+    //   if (parentFile.type !== "folder") {
+    //     return res.status(400).json({ error: "Parent is not a folder" });
+    //   }
+    // }
 
     const fileName = uuidv4();
 
+    await fsp.mkdir(FOLDER_PATH, {recursive:true}).catch((err) => {
+            console.error(`Error in mkdir: ${err}`);
+        });
     const localPath = path.join(FOLDER_PATH, fileName);
 
     if (type !== "folder") {
@@ -92,9 +114,14 @@ const FilesController = {
         .collection("files")
         .insertOne(newFile);
 
+      const { userId, name, type, isPublic, parentId } = newFile;
       const createdFile = {
         id: result.insertedId,
-        ...newFile,
+        userId,
+        name,
+        type,
+        isPublic,
+        parentId,
       };
 
       return res.status(201).json(createdFile);
